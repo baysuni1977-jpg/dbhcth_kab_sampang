@@ -1,0 +1,58 @@
+/**
+ * ZETTBOS BACKEND LOGIC
+ * File: code.gs
+ * Fungsi: Menangani HTTP Get Request dan Backend Server-side processing
+ */
+
+function doGet(e) {
+  try {
+    const htmlOutput = HtmlService.createHtmlOutputFromFile('index');
+    htmlOutput.setTitle('Zettbos App Wrapper');
+    htmlOutput.addMetaTag('viewport', 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no');
+    htmlOutput.setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+    return htmlOutput;
+  } catch (error) {
+    return ContentService.createTextOutput("Terjadi Kesalahan Server: " + error.message);
+  }
+}
+
+/**
+ * Fungsi untuk mencatat aktivitas ke dalam Google Sheets
+ * Menggunakan batch processing dan real-time sync (flush)
+ */
+function saveLogToSheet(message) {
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    let sheet = ss.getSheetByName("App_Logs");
+    
+    // Fallback jika sheet belum disetup
+    if (!sheet) {
+      return { status: 'error', message: 'Sheet App_Logs belum disetup.' };
+    }
+
+    // Standard Time Zone
+    const timestamp = Utilities.formatDate(new Date(), 'Asia/Jakarta', 'dd/MM/yyyy HH:mm:ss');
+    
+    // Generate Sequential ID (Format: LOG-0001)
+    const lastRow = sheet.getLastRow();
+    let seqNumber = 1;
+    if (lastRow > 1) {
+      const lastId = sheet.getRange(lastRow, 1).getValue().toString();
+      const splitId = lastId.split('-');
+      if (splitId.length > 1) {
+        seqNumber = parseInt(splitId[1]) + 1;
+      }
+    }
+    const logId = 'LOG-' + ('0000' + seqNumber).slice(-4);
+
+    // Batch Process Input
+    sheet.appendRow([logId, timestamp, message, "Berhasil"]);
+    
+    // Real-Time Synchronization (Anti-Delay Protocol)
+    SpreadsheetApp.flush();
+
+    return { status: 'success', id: logId, time: timestamp };
+  } catch(err) {
+    return { status: 'error', message: err.message };
+  }
+}
